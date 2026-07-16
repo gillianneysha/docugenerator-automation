@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; padding: 10px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input, select { width: 100%; padding: 5px; margin-top: 3px; box-sizing: border-box; }
+    button { margin-top: 15px; padding: 8px 14px; }
+    #msg { margin-top: 10px; white-space: pre-wrap; }
+    .error { color: #b00020; }
+    .success { color: #0b7a2b; }
+  </style>
+</head>
+<body>
+  <label>Template Name</label>
+  <input id="templateName" placeholder="e.g. Employment Contract">
+
+  <label>Google Doc URL (the template you want to register)</label>
+  <input id="docUrl" placeholder="Paste the Google Doc link">
+
+  <label>Source Sheet (which sheet's columns feed this template)</label>
+  <select id="sourceSheet"></select>
+
+  <label>Output Folder URL</label>
+  <input id="folderUrl" placeholder="Paste the Drive folder link">
+
+  <button onclick="submitForm()">Register</button>
+  <div id="msg"></div>
+
+  <script>
+    google.script.run.withSuccessHandler(populateSheets).getSheetNames_UI();
+
+    function populateSheets(names) {
+      const select = document.getElementById('sourceSheet');
+      names.forEach(n => {
+        if (['Template Registry', 'Settings', 'Logs'].includes(n)) return;
+        const opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        select.appendChild(opt);
+      });
+    }
+
+    function submitForm() {
+      const templateName = document.getElementById('templateName').value.trim();
+      const docUrl = document.getElementById('docUrl').value.trim();
+      const sourceSheet = document.getElementById('sourceSheet').value;
+      const folderUrl = document.getElementById('folderUrl').value.trim();
+      document.getElementById('msg').textContent = 'Checking placeholders...';
+      document.getElementById('msg').className = '';
+
+      google.script.run
+        .withSuccessHandler(showResult)
+        .withFailureHandler(showError)
+        .registerTemplateFromForm_UI(templateName, docUrl, sourceSheet, folderUrl);
+    }
+
+    function showResult(result) {
+      const msg = document.getElementById('msg');
+      msg.textContent = result.message;
+      msg.className = result.success ? 'success' : 'error';
+    }
+    function showError(err) {
+      const msg = document.getElementById('msg');
+      msg.textContent = 'Error: ' + err.message;
+      msg.className = 'error';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; padding: 10px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    select, input { width: 100%; padding: 5px; margin-top: 3px; box-sizing: border-box; }
+    button { margin-top: 15px; padding: 8px 14px; }
+    #results { margin-top: 12px; }
+    .row-result { padding: 4px 0; border-bottom: 1px solid #eee; }
+    .error { color: #b00020; }
+    .success { color: #0b7a2b; }
+  </style>
+</head>
+<body>
+  <label>Template</label>
+  <select id="templateName"></select>
+
+  <label>Generate for</label>
+  <select id="rowMode">
+    <option value="selected">Selected Row(s)</option>
+    <option value="all">All Rows</option>
+  </select>
+
+  <label>Output Format</label>
+  <select id="outputFormat">
+    <option value="docx">Word (.docx)</option>
+    <option value="pdf">PDF</option>
+    <option value="both">Both</option>
+  </select>
+
+  <label>File Name Pattern</label>
+  <input id="nameTemplate" placeholder="e.g. {{EmployeeName}} - Contract">
+
+  <button onclick="generate()">Generate</button>
+  <div id="results"></div>
+
+  <script>
+    google.script.run.withSuccessHandler(populateTemplates).listTemplateNames();
+
+    function populateTemplates(names) {
+      const select = document.getElementById('templateName');
+      names.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        select.appendChild(opt);
+      });
+    }
+
+    function generate() {
+      const templateName = document.getElementById('templateName').value;
+      const rowMode = document.getElementById('rowMode').value;
+      const outputFormat = document.getElementById('outputFormat').value;
+      const nameTemplate = document.getElementById('nameTemplate').value || '{{EmployeeName}}';
+
+      document.getElementById('results').innerHTML = 'Generating...';
+      google.script.run
+        .withSuccessHandler(showResults)
+        .withFailureHandler(showFailure)
+        .generateDocuments_UI(templateName, rowMode, outputFormat, nameTemplate);
+    }
+
+    function showResults(results) {
+      const div = document.getElementById('results');
+      div.innerHTML = '';
+      results.forEach(r => {
+        const p = document.createElement('div');
+        p.className = 'row-result ' + (r.status === 'success' ? 'success' : 'error');
+        p.textContent = r.status === 'success'
+          ? ('Row ' + r.row + ': ' + r.fileName + ' ✔')
+          : ('Row ' + r.row + ': ' + r.message);
+        div.appendChild(p);
+      });
+    }
+    function showFailure(err) {
+      document.getElementById('results').innerHTML = '<span class="error">Error: ' + err.message + '</span>';
+    }
+  </script>
+</body>
+</html>
