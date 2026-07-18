@@ -6,8 +6,6 @@
 
 function scanPlaceholders_(docId) {
   const doc = DocumentApp.openById(docId);
-  const text = doc.getBody().getText()
-    + doc.getHeader().getText ? '' : ''; // header/footer handled below
 
   let fullText = doc.getBody().getText();
   const header = doc.getHeader();
