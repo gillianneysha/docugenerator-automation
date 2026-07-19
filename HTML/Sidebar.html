@@ -1,81 +1,312 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <base target="_top">
-  <style>
-    body { font-family: Arial, sans-serif; font-size: 13px; padding: 10px; }
-    label { display: block; margin-top: 10px; font-weight: bold; }
-    select, input { width: 100%; padding: 5px; margin-top: 3px; box-sizing: border-box; }
-    button { margin-top: 15px; padding: 8px 14px; }
-    #results { margin-top: 12px; }
-    .row-result { padding: 4px 0; border-bottom: 1px solid #eee; }
-    .error { color: #b00020; }
-    .success { color: #0b7a2b; }
-  </style>
-</head>
-<body>
-  <label>Template</label>
-  <select id="templateName"></select>
+  <head>
+    <base target="_top" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        padding: 10px;
+      }
+      label {
+        display: block;
+        margin-top: 10px;
+        font-weight: bold;
+      }
+      select,
+      input {
+        width: 100%;
+        padding: 5px;
+        margin-top: 3px;
+        box-sizing: border-box;
+      }
+      button {
+        margin-top: 15px;
+        padding: 8px 14px;
+      }
+      #results {
+        margin-top: 12px;
+      }
+      .row-result {
+        padding: 4px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .error {
+        color: #b00020;
+      }
+      .success {
+        color: #0b7a2b;
+      }
+      #rowList label,
+      #filterPicker label {
+        font-weight: normal;
+      }
+    </style>
+  </head>
+  <body>
+    <label>Template</label>
+    <select id="templateName" onchange="loadRows()"></select>
 
-  <label>Generate for</label>
-  <select id="rowMode">
-    <option value="selected">Selected Row(s)</option>
-    <option value="all">All Rows</option>
-  </select>
+    <label>Generate for</label>
+    <select id="rowMode" onchange="toggleRowPicker()">
+      <option value="selected">Selected Row(s)</option>
+      <option value="all">All Rows</option>
+      <option value="filtered">Filter by Column</option>
+    </select>
 
-  <label>Output Format</label>
-  <select id="outputFormat">
-    <option value="docx">Word (.docx)</option>
-    <option value="pdf">PDF</option>
-    <option value="both">Both</option>
-  </select>
+    <div id="rowPicker" style="margin-top: 8px">
+      <label>Row numbers (comma-separated, ranges OK — e.g. 2,5,9-12)</label>
+      <input id="rowNumbersInput" placeholder="e.g. 2,5,9-12" />
+      <div
+        id="rowList"
+        style="
+          max-height: 180px;
+          overflow-y: auto;
+          border: 1px solid #ddd;
+          padding: 6px;
+          margin-top: 8px;
+          font-size: 12px;
+          color: #555;
+        "
+      ></div>
+    </div>
 
-  <label>File Name Pattern</label>
-  <input id="nameTemplate" placeholder="e.g. {{EmployeeName}} - Contract">
+    <div id="filterPicker" style="margin-top: 8px; display: none">
+      <label>Filter by column</label>
+      <select id="filterColumn" onchange="loadColumnValues()"></select>
+      <label>Where value equals</label>
+      <select id="filterValue"></select>
+      <div
+        id="filterCount"
+        style="margin-top: 6px; color: #555; font-size: 12px"
+      ></div>
+    </div>
 
-  <button onclick="generate()">Generate</button>
-  <div id="results"></div>
+    <label>Output Format</label>
+    <select id="outputFormat">
+      <option value="docx">Word (.docx)</option>
+      <option value="pdf">PDF</option>
+      <option value="both">Both</option>
+    </select>
 
-  <script>
-    google.script.run.withSuccessHandler(populateTemplates).listTemplateNames();
+    <label>File Name Pattern</label>
+    <input id="nameTemplate" placeholder="e.g. {{Employee Name}} - Contract" />
 
-    function populateTemplates(names) {
-      const select = document.getElementById('templateName');
-      names.forEach(n => {
-        const opt = document.createElement('option');
-        opt.value = n; opt.textContent = n;
-        select.appendChild(opt);
-      });
-    }
+    <button onclick="generate()">Generate</button>
+    <div id="results"></div>
 
-    function generate() {
-      const templateName = document.getElementById('templateName').value;
-      const rowMode = document.getElementById('rowMode').value;
-      const outputFormat = document.getElementById('outputFormat').value;
-      const nameTemplate = document.getElementById('nameTemplate').value || '{{EmployeeName}}';
-
-      document.getElementById('results').innerHTML = 'Generating...';
+    <script>
       google.script.run
-        .withSuccessHandler(showResults)
-        .withFailureHandler(showFailure)
-        .generateDocuments_UI(templateName, rowMode, outputFormat, nameTemplate);
-    }
+        .withSuccessHandler(populateTemplates)
+        .listTemplateNames();
 
-    function showResults(results) {
-      const div = document.getElementById('results');
-      div.innerHTML = '';
-      results.forEach(r => {
-        const p = document.createElement('div');
-        p.className = 'row-result ' + (r.status === 'success' ? 'success' : 'error');
-        p.textContent = r.status === 'success'
-          ? ('Row ' + r.row + ': ' + r.fileName + ' ✔')
-          : ('Row ' + r.row + ': ' + r.message);
-        div.appendChild(p);
-      });
-    }
-    function showFailure(err) {
-      document.getElementById('results').innerHTML = '<span class="error">Error: ' + err.message + '</span>';
-    }
-  </script>
-</body>
+      function populateTemplates(names) {
+        const select = document.getElementById("templateName");
+        select.innerHTML = "";
+        names.forEach((n) => {
+          const opt = document.createElement("option");
+          opt.value = n;
+          opt.textContent = n;
+          select.appendChild(opt);
+        });
+        if (names.length) loadRows();
+        toggleRowPicker();
+      }
+
+      function loadRows() {
+        const templateName = document.getElementById("templateName").value;
+        if (!templateName) return;
+        document.getElementById("rowList").innerHTML = "Loading...";
+        google.script.run
+          .withSuccessHandler(renderRows)
+          .withFailureHandler(showFailure)
+          .getTemplateRows_UI(templateName);
+        google.script.run
+          .withSuccessHandler(renderColumnDropdown)
+          .withFailureHandler(showFailure)
+          .getTemplateHeaders_UI(templateName);
+      }
+
+      function renderRows(rows) {
+        const container = document.getElementById("rowList");
+        container.innerHTML =
+          "<strong>Reference:</strong><br>" +
+          rows
+            .map((r) => "Row " + r.row + " — " + (r.label || "(no label)"))
+            .join("<br>");
+      }
+
+      function parseRowNumbers(input) {
+        const result = [];
+        input.split(",").forEach((part) => {
+          part = part.trim();
+          if (!part) return;
+          if (part.includes("-")) {
+            const [start, end] = part
+              .split("-")
+              .map((n) => parseInt(n.trim(), 10));
+            if (!isNaN(start) && !isNaN(end)) {
+              for (let i = start; i <= end; i++) result.push(i);
+            }
+          } else {
+            const n = parseInt(part, 10);
+            if (!isNaN(n)) result.push(n);
+          }
+        });
+        return [...new Set(result)];
+      }
+
+      function renderColumnDropdown(headers) {
+        const select = document.getElementById("filterColumn");
+        select.innerHTML = "";
+        headers.forEach((h) => {
+          const opt = document.createElement("option");
+          opt.value = h;
+          opt.textContent = h;
+          select.appendChild(opt);
+        });
+        if (headers.length) loadColumnValues();
+      }
+
+      function loadColumnValues() {
+        const templateName = document.getElementById("templateName").value;
+        const column = document.getElementById("filterColumn").value;
+        if (!column) return;
+        document.getElementById("filterValue").innerHTML =
+          "<option>Loading...</option>";
+        google.script.run
+          .withSuccessHandler(renderColumnValues)
+          .withFailureHandler(showFailure)
+          .getColumnValues_UI(templateName, column);
+      }
+
+      function renderColumnValues(values) {
+        const select = document.getElementById("filterValue");
+        select.innerHTML = "";
+        values.forEach((v) => {
+          const opt = document.createElement("option");
+          opt.value = v;
+          opt.textContent = v;
+          select.appendChild(opt);
+        });
+        document.getElementById("filterCount").textContent =
+          values.length + " distinct value(s)";
+      }
+
+      function toggleSelectAll() {
+        const checked = document.getElementById("selectAll").checked;
+        document
+          .querySelectorAll(".row-cb")
+          .forEach((cb) => (cb.checked = checked));
+      }
+
+      function toggleRowPicker() {
+        const mode = document.getElementById("rowMode").value;
+        document.getElementById("rowPicker").style.display =
+          mode === "selected" ? "block" : "none";
+        document.getElementById("filterPicker").style.display =
+          mode === "filtered" ? "block" : "none";
+      }
+
+      function getCheckedRows() {
+        return Array.from(document.querySelectorAll(".row-cb:checked")).map(
+          (cb) => Number(cb.value),
+        );
+      }
+
+      function generate() {
+        const templateName = document.getElementById("templateName").value;
+        const rowMode = document.getElementById("rowMode").value;
+        const outputFormat = document.getElementById("outputFormat").value;
+        const nameTemplate =
+          document.getElementById("nameTemplate").value || "{{Employee Name}}";
+
+        if (rowMode === "selected") {
+          const selectedRows = parseRowNumbers(
+            document.getElementById("rowNumbersInput").value,
+          );
+          if (selectedRows.length === 0) {
+            document.getElementById("results").innerHTML =
+              '<span class="error">Enter at least one row number (e.g. 2,5,9-12).</span>';
+            return;
+          }
+          runGenerate(
+            templateName,
+            "selected",
+            selectedRows,
+            outputFormat,
+            nameTemplate,
+          );
+        } else if (rowMode === "filtered") {
+          const column = document.getElementById("filterColumn").value;
+          const value = document.getElementById("filterValue").value;
+          if (!column || !value) {
+            document.getElementById("results").innerHTML =
+              '<span class="error">Choose a column and value to filter by.</span>';
+            return;
+          }
+          document.getElementById("results").innerHTML =
+            "Finding matching rows...";
+          google.script.run
+            .withSuccessHandler((rows) => {
+              if (rows.length === 0) {
+                document.getElementById("results").innerHTML =
+                  '<span class="error">No rows match that filter.</span>';
+                return;
+              }
+              runGenerate(
+                templateName,
+                "selected",
+                rows,
+                outputFormat,
+                nameTemplate,
+              );
+            })
+            .withFailureHandler(showFailure)
+            .getFilteredRows_UI(templateName, column, value);
+        } else {
+          runGenerate(templateName, "all", [], outputFormat, nameTemplate);
+        }
+      }
+
+      function runGenerate(
+        templateName,
+        rowMode,
+        selectedRows,
+        outputFormat,
+        nameTemplate,
+      ) {
+        document.getElementById("results").innerHTML = "Generating...";
+        google.script.run
+          .withSuccessHandler(showResults)
+          .withFailureHandler(showFailure)
+          .generateDocuments_UI(
+            templateName,
+            rowMode,
+            selectedRows,
+            outputFormat,
+            nameTemplate,
+          );
+      }
+
+      function showResults(results) {
+        const div = document.getElementById("results");
+        div.innerHTML = "";
+        results.forEach((r) => {
+          const p = document.createElement("div");
+          p.className =
+            "row-result " + (r.status === "success" ? "success" : "error");
+          p.textContent =
+            r.status === "success"
+              ? "Row " + r.row + ": " + r.fileName + " ✔"
+              : "Row " + r.row + ": " + r.message;
+          div.appendChild(p);
+        });
+      }
+      function showFailure(err) {
+        document.getElementById("results").innerHTML =
+          '<span class="error">Error: ' + err.message + "</span>";
+      }
+    </script>
+  </body>
 </html>
