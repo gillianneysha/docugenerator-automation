@@ -40,6 +40,7 @@ function initializeSheets() {
     "Status",
     "Notes",
   ]);
+  createSheetIfMissing_(ss, "Clause Library", ["Clause Key", "Option", "Text"]);
 
   const hasDefaultFolder = getSetting_("Default Output Folder");
   if (!hasDefaultFolder) {

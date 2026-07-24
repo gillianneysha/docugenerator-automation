@@ -155,3 +155,23 @@ function getAllSettings_() {
   });
   return map;
 }
+
+function getClauseText_(clauseKey, option) {
+  const { rows } = getSheetDataAsObjects_("Clause Library");
+  const match = rows.find(
+    (r) =>
+      String(r["Clause Key"]).trim() === String(clauseKey).trim() &&
+      String(r["Option"]).trim() === String(option).trim(),
+  );
+  return match ? match["Text"] : "";
+}
+
+function resolveClauseTemplate_(text, rowData) {
+  if (!text) return "";
+  let resolved = text.replace(/\\n/g, "\n");
+  resolved = resolved.replace(/{{\s*([^{}]+?)\s*}}/g, (match, rawKey) => {
+    const key = rawKey.trim();
+    return rowData[key] !== undefined ? String(rowData[key]) : match;
+  });
+  return resolved;
+}

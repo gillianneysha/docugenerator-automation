@@ -27,7 +27,7 @@ function scanPlaceholders_(docId) {
   return [...new Set(matches.map((m) => m.replace(/[{}]/g, "").trim()))];
 }
 
-const DERIVED_KEYS_ = ["day", "month"];
+const DERIVED_KEYS_ = ["day", "month", "LEAVE_ACCRUAL_CLAUSE", "LEAVE_CARRYOVER_CLAUSE", "LEAVE_USAGE_CLAUSE", "HMO_CLAUSE", "ANNUAL_SALARY"];
 
 function validatePlaceholders_(docId, sourceSheetName) {
   const placeholders = scanPlaceholders_(docId);
