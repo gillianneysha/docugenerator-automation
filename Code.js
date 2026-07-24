@@ -16,48 +16,17 @@ function onOpen() {
 
 function initializeSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  createSheetIfMissing_(ss, "Template Registry", [
-    "Template Name",
-    "Google Doc ID",
-    "Source Sheet",
-    "Output Folder ID",
-    "Status",
-  ]);
-  createSheetIfMissing_(ss, "Settings", ["Setting", "Value"]);
-  createSheetIfMissing_(ss, "Logs", [
-    "Date",
-    "User",
-    "Template",
-    "Document Name",
-    "Status",
-    "Notes",
-  ]);
-  createSheetIfMissing_(ss, "Logs Archive", [
-    "Date",
-    "User",
-    "Template",
-    "Document Name",
-    "Status",
-    "Notes",
-  ]);
 
-  const hasDefaultFolder = getSetting_("Default Output Folder");
-  if (!hasDefaultFolder) {
-    const folders = initializeDriveFolders_();
-    setSetting_("Default Output Folder", folders.generatedDocsId);
-    setSetting_("Default PDF Folder", folders.generatedPdfsId);
-    if (!getSetting_("Company Name")) setSetting_("Company Name", "");
-    SpreadsheetApp.getUi().alert(
-      "Setup complete.\n\nCreated Drive folder structure at: " +
-        folders.rootUrl +
-        "\n\nDefault Output Folder and Default PDF Folder have been set automatically. " +
-        'Fill in "Company Name" in Settings, then register your first template.',
-    );
-  } else {
-    SpreadsheetApp.getUi().alert(
-      "Sheets are already set up. Drive folders were not recreated.",
-    );
-  }
+  createSheetIfMissing_(ss, 'Template Registry',
+    ['Template Name', 'Google Doc ID', 'Source Sheet', 'Output Folder ID', 'Status']);
+
+  createSheetIfMissing_(ss, 'Settings',
+    ['Setting', 'Value']);
+
+  createSheetIfMissing_(ss, 'Logs',
+    ['Date', 'User', 'Template', 'Document Name', 'Status', 'Notes']);
+
+  SpreadsheetApp.getUi().alert('Setup complete. Fill in the Settings sheet (Default Output Folder, Default PDF Folder, Company Name), then register your first template.');
 }
 
 function createSheetIfMissing_(ss, name, headers) {

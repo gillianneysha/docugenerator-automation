@@ -51,8 +51,12 @@ function generateDocuments(
         template["Source Sheet"],
         row.__row,
         "Generate Status",
+<<<<<<< HEAD
         "✅ Generated",
         result.docUrl || result.pdfUrl,
+=======
+        "Generated",
+>>>>>>> e59f76b6978e51f1f4600b42355f2482e0d46617
       );
       appendLog_(templateName, result.fileName, "Success", "");
       results.push({
@@ -67,7 +71,11 @@ function generateDocuments(
         template["Source Sheet"],
         row.__row,
         "Generate Status",
+<<<<<<< HEAD
         "⚠️ Error",
+=======
+        "Error",
+>>>>>>> e59f76b6978e51f1f4600b42355f2482e0d46617
       );
       appendLog_(templateName, "(row " + row.__row + ")", "Error", err.message);
       results.push({ row: row.__row, status: "error", message: err.message });
@@ -83,7 +91,19 @@ function generateSingleDocument_(
   outputFormat,
   nameTemplate,
 ) {
+<<<<<<< HEAD
   const mergedData = Object.assign({}, getAllSettings_(), rowData);
+=======
+  const derived = deriveDateFields_(rowData);
+  const clauses = deriveClauseFields_(rowData);
+  const mergedData = Object.assign(
+    {},
+    getAllSettings_(),
+    rowData,
+    derived,
+    clauses,
+  );
+>>>>>>> e59f76b6978e51f1f4600b42355f2482e0d46617
 
   const fileName = sanitizeFileName_(
     fillPlaceholders_(nameTemplate, mergedData),
@@ -116,6 +136,17 @@ function generateSingleDocument_(
   return result;
 }
 
+function deriveDateFields_(rowData) {
+  const raw = rowData["CREATE DATE"];
+  if (!raw) return {};
+  const dt = new Date(raw);
+  if (isNaN(dt.getTime())) return {};
+  return {
+    day: dt.getDate(),
+    month: Utilities.formatDate(dt, Session.getScriptTimeZone(), "MMMM"),
+  };
+}
+
 function replaceAllPlaceholdersInDoc_(doc, rowData) {
   const body = doc.getBody();
   const header = doc.getHeader();
@@ -145,4 +176,72 @@ function fillPlaceholders_(templateString, rowData) {
 
 function escapeRegex_(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+<<<<<<< HEAD
 }
+=======
+}
+
+function deriveClauseFields_(rowData) {
+  return {
+    LEAVE_ACCRUAL_CLAUSE: resolveClauseTemplate_(
+      getClauseText_("ACCRUAL", rowData["ACCRUAL OPTION"]),
+      rowData,
+    ),
+    LEAVE_CARRYOVER_CLAUSE: resolveClauseTemplate_(
+      getClauseText_("CARRYOVER", rowData["CARRYOVER OPTION"]),
+      rowData,
+    ),
+    LEAVE_USAGE_CLAUSE: resolveClauseTemplate_(
+      getClauseText_("LEAVE_USAGE", rowData["LEAVE USAGE OPTION"]),
+      rowData,
+    ),
+    HMO_CLAUSE: buildHmoClause_(rowData),
+    ANNUAL_SALARY: computeAnnualSalary_(rowData),
+    BUSINESS_TOOLS_CLAUSE: resolveClauseTemplate_(
+      getClauseText_("BUSINESS_TOOLS", rowData["BUSINESS TOOLS OPTION"]),
+      rowData,
+    ),
+  };
+}
+
+function buildHmoClause_(row) {
+  const hasHmo = String(row["HAS HMO"] || "")
+    .trim()
+    .toUpperCase();
+  if (hasHmo !== "Y") {
+    return getClauseText_("HMO", "NO");
+  }
+
+  const effectiveText = resolveClauseTemplate_(
+    getClauseText_("HMO_EFFECTIVE", row["HMO EFFECTIVE OPTION"]),
+    row,
+  );
+  const coverageText = getClauseText_(
+    "HMO_COVERAGE",
+    row["HMO COVERAGE OPTION"],
+  );
+  const mbl = row["HMO MBL"] || "XX,XXX";
+
+  return (
+    "The Employee shall be eligible for HMO enrollment effective " +
+    effectiveText +
+    ", subject to completion of the HMO enrollment and activation process. " +
+    "Coverage shall apply to " +
+    coverageText +
+    ", with a Maximum Benefit Limit (MBL) of Php " +
+    mbl +
+    " per year, subject to Company policy and provider terms and conditions."
+  );
+}
+
+function computeAnnualSalary_(row) {
+  const raw = String(row["Basic Salary"] || "").replace(/,/g, "");
+  const monthly = parseFloat(raw);
+  if (isNaN(monthly)) return "";
+  const annual = monthly * 12;
+  return annual.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+>>>>>>> e59f76b6978e51f1f4600b42355f2482e0d46617
