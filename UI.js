@@ -79,35 +79,6 @@ function registerTemplateFromForm_UI(
     extractIdFromUrl_(folderUrl),
   );
 }
-function getTemplateRows_UI(templateName) {
-  const template = getTemplateByName_(templateName);
-  const { headers, rows } = getSheetDataAsObjects_(template["Source Sheet"]);
-  const labelHeaders = headers.slice(0, 3);
-  return rows.map((r) => ({
-    row: r.__row,
-    label: labelHeaders
-      .map((h) => r[h])
-      .filter((v) => v !== "" && v !== null && v !== undefined)
-      .join(" — "),
-  }));
-}
-function getTemplateHeaders_UI(templateName) {
-  const template = getTemplateByName_(templateName);
-  return getSheetDataAsObjects_(template["Source Sheet"]).headers;
-}
-function getColumnValues_UI(templateName, column) {
-  const template = getTemplateByName_(templateName);
-  const values = getSheetDataAsObjects_(template["Source Sheet"])
-    .rows.map((r) => r[column])
-    .filter((v) => v !== "" && v !== null && v !== undefined);
-  return [...new Set(values)].sort();
-}
-function getFilteredRows_UI(templateName, column, value) {
-  const template = getTemplateByName_(templateName);
-  return getSheetDataAsObjects_(template["Source Sheet"])
-    .rows.filter((r) => String(r[column]) === String(value))
-    .map((r) => r.__row);
-}
 function generateDocuments_UI(
   templateName,
   rowMode,
