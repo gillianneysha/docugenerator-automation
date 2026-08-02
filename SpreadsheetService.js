@@ -6,13 +6,7 @@
 function getSheetDataAsObjects_(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error("Sheet not found: " + sheetName);
-  if (!sheet) throw new Error("Sheet not found: " + sheetName);
 
-  // getDisplayValues() = exactly what's shown in the cell (commas, currency,
-  // date formats) instead of the raw value. Formatting stays controlled
-  // entirely from the sheet — no code changes needed if HR changes a format.
-  const values = sheet.getDataRange().getDisplayValues();
-  const headers = values[0].map((h) => String(h).trim());
   // getDisplayValues() = exactly what's shown in the cell (commas, currency,
   // date formats) instead of the raw value. Formatting stays controlled
   // entirely from the sheet — no code changes needed if HR changes a format.
@@ -24,9 +18,6 @@ function getSheetDataAsObjects_(sheetName) {
     if (values[i].every((cell) => cell === "")) continue;
     const obj = { __row: i + 1 };
     headers.forEach((h, idx) => (obj[h] = values[i][idx]));
-    if (values[i].every((cell) => cell === "")) continue;
-    const obj = { __row: i + 1 };
-    headers.forEach((h, idx) => (obj[h] = values[i][idx]));
     rows.push(obj);
   }
   return { headers, rows };
@@ -35,14 +26,10 @@ function getSheetDataAsObjects_(sheetName) {
 function getTemplateRegistry_() {
   const { rows } = getSheetDataAsObjects_("Template Registry");
   return rows.filter((r) => String(r["Status"]).toLowerCase() === "active");
-  const { rows } = getSheetDataAsObjects_("Template Registry");
-  return rows.filter((r) => String(r["Status"]).toLowerCase() === "active");
 }
 
 function getTemplateByName_(name) {
   const registry = getTemplateRegistry_();
-  const match = registry.find((r) => r["Template Name"] === name);
-  if (!match) throw new Error("Template not found or inactive: " + name);
   const match = registry.find((r) => r["Template Name"] === name);
   if (!match) throw new Error("Template not found or inactive: " + name);
   return match;
@@ -57,34 +44,9 @@ function addTemplateToRegistry_(
   const sheet =
     SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Template Registry");
   sheet.appendRow([templateName, docId, sourceSheet, outputFolderId, "Active"]);
-function addTemplateToRegistry_(
-  templateName,
-  docId,
-  sourceSheet,
-  outputFolderId,
-) {
-  const sheet =
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Template Registry");
-  sheet.appendRow([templateName, docId, sourceSheet, outputFolderId, "Active"]);
 }
 
 function getSetting_(key) {
-  const { rows } = getSheetDataAsObjects_("Settings");
-  const row = rows.find((r) => r["Setting"] === key);
-  return row ? row["Value"] : null;
-}
-
-function setSetting_(key, value) {
-  const sheet =
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Settings");
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === key) {
-      sheet.getRange(i + 1, 2).setValue(value);
-      return;
-    }
-  }
-  sheet.appendRow([key, value]);
   const { rows } = getSheetDataAsObjects_("Settings");
   const row = rows.find((r) => r["Setting"] === key);
   return row ? row["Value"] : null;
@@ -126,14 +88,12 @@ function writeStatus_(sourceSheet, rowNumber, columnName, value, linkUrl) {
 
 function appendLog_(templateName, docName, status, notes) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
   sheet.appendRow([
     new Date(),
     Session.getActiveUser().getEmail(),
     templateName,
     docName,
     status,
-    notes || "",
     notes || "",
   ]);
 }
@@ -203,4 +163,51 @@ function getAllSettings_() {
     if (r["Setting"]) map[r["Setting"]] = r["Value"];
   });
   return map;
+}
+
+/** Moves Logs rows older than `monthsOld` months into "Logs Archive". */
+function archiveOldLogs(monthsOld) {
+  monthsOld = monthsOld || 6;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const logs = ss.getSheetByName("Logs");
+  const archive =
+    ss.getSheetByName("Logs Archive") ||
+    createSheetIfMissing_(ss, "Logs Archive", [
+      "Date",
+      "User",
+      "Template",
+      "Document Name",
+      "Status",
+      "Notes",
+    ]);
+
+  const data = logs.getDataRange().getValues();
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - monthsOld);
+
+  const toKeep = [data[0]];
+  const toArchive = [];
+  for (let i = 1; i < data.length; i++) {
+    const rowDate = data[i][0];
+    if (rowDate instanceof Date && rowDate < cutoff) toArchive.push(data[i]);
+    else toKeep.push(data[i]);
+  }
+
+  if (toArchive.length === 0) {
+    SpreadsheetApp.getUi().alert(
+      "No log entries older than " + monthsOld + " months. Nothing to archive.",
+    );
+    return;
+  }
+
+  archive
+    .getRange(archive.getLastRow() + 1, 1, toArchive.length, toArchive[0].length)
+    .setValues(toArchive);
+  logs.clearContents();
+  logs.getRange(1, 1, toKeep.length, toKeep[0].length).setValues(toKeep);
+  logs.setFrozenRows(1);
+
+  SpreadsheetApp.getUi().alert(
+    "Archived " + toArchive.length + " log entries to \"Logs Archive\".",
+  );
 }

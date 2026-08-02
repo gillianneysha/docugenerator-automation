@@ -368,15 +368,129 @@ function replaceAllPlaceholdersInDoc_(doc, rowData) {
   Object.keys(rowData).forEach((key) => {
     if (key === "__row") return;
     const placeholder = "{{" + key + "}}";
-    let value =
+    const rawValue =
       rowData[key] === null || rowData[key] === undefined
         ? ""
-        : String(rowData[key]);
-    value = value.replace(/\n/g, "\v");
-    body.replaceText(escapeRegex_(placeholder), value);
-    if (header) header.replaceText(escapeRegex_(placeholder), value);
-    if (footer) footer.replaceText(escapeRegex_(placeholder), value);
+        : String(rowData[key]).replace(/\r\n/g, "\n");
+
+    if (rawValue.indexOf("\n") === -1) {
+      // Fast path: single-line value, plain inline text swap.
+      const value = escapeReplacement_(rawValue);
+      body.replaceText(escapeRegex_(placeholder), value);
+      if (header) header.replaceText(escapeRegex_(placeholder), value);
+      if (footer) footer.replaceText(escapeRegex_(placeholder), value);
+    } else {
+      // Multi-line value (e.g. a Job Description with several lines/bullets).
+      // replaceText can't create real paragraph breaks or bullets, so build
+      // actual paragraphs / list items instead. Blank lines in the cell
+      // become blank paragraphs (spacing preserved), and lines starting with
+      // "- ", "* ", or "• " become real bulleted list items.
+      replaceMultilinePlaceholder_(body, placeholder, rawValue);
+      if (header) replaceMultilinePlaceholder_(header, placeholder, rawValue);
+      if (footer) replaceMultilinePlaceholder_(footer, placeholder, rawValue);
+    }
   });
+}
+
+// $ has special meaning in Docs' replaceText replacement string (regex
+// backreferences); escape it so a literal "$" in a value (e.g. "$50,000")
+// isn't swallowed.
+function escapeReplacement_(str) {
+  return str.replace(/\$/g, "$$$$");
+}
+
+function replaceMultilinePlaceholder_(container, placeholder, value) {
+  const lines = value.split("\n");
+  const searchPattern = escapeRegex_(placeholder);
+
+  let result = container.findText(searchPattern);
+  while (result !== null) {
+    const element = result.getElement();
+    const startOffset = result.getStartOffset();
+    const endOffsetInclusive = result.getEndOffsetInclusive();
+    const text = element.editAsText();
+    const fullText = text.getText();
+    const before = fullText.substring(0, startOffset);
+    const after = fullText.substring(endOffsetInclusive + 1);
+
+    let para = element.getParent();
+    while (
+      para &&
+      para.getType() !== DocumentApp.ElementType.PARAGRAPH &&
+      para.getType() !== DocumentApp.ElementType.LIST_ITEM
+    ) {
+      para = para.getParent();
+    }
+
+    if (!para || para.getParent() !== container) {
+      // Inside a table cell or other nested container — can't insert real
+      // paragraphs there, so join lines with a soft line break instead.
+      text.deleteText(startOffset, endOffsetInclusive);
+      text.insertText(startOffset, escapeReplacement_(lines.join("\v")));
+      result = container.findText(searchPattern);
+      continue;
+    }
+
+    const bodyIndex = container.getChildIndex(para);
+    // True only if the placeholder is the paragraph's entire content — the
+    // common case, e.g. a template line that's just "{{Job Description}}".
+    const placeholderIsAloneOnLine =
+      before.trim() === "" && after.trim() === "";
+
+    const built = lines.map((line) => {
+      const m = line.match(/^\s*[-*•]\s+(.*)$/);
+      return { bullet: !!m, text: m ? m[1] : line };
+    });
+
+    let insertAt = bodyIndex;
+    let lastPara;
+
+    if (placeholderIsAloneOnLine) {
+      // Nothing else shares this paragraph — repurpose it directly instead
+      // of leaving a stray plain paragraph in front of the real content.
+      if (built[0].bullet) {
+        lastPara = container.insertListItem(bodyIndex, built[0].text);
+        lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
+        lastPara.setSpacingAfter(6);
+        para.removeFromParent();
+      } else {
+        text.setText(built[0].text);
+        lastPara = para;
+      }
+    } else {
+      // Placeholder shares its line with other text — keep that text in
+      // place and just swap the placeholder for the first output line.
+      text.deleteText(startOffset, endOffsetInclusive);
+      text.insertText(startOffset, built[0].text);
+      if (after) {
+        const afterStart = startOffset + built[0].text.length;
+        text.deleteText(afterStart, afterStart + after.length - 1);
+      }
+      lastPara = para;
+    }
+
+    for (let i = 1; i < built.length; i++) {
+      insertAt++;
+      if (built[i].bullet) {
+        lastPara = container.insertListItem(insertAt, built[i].text);
+        lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
+        // Guaranteed breathing room between bullets, regardless of whether
+        // the sheet cell had a blank line between them — don't rely on
+        // exact source formatting for visible spacing.
+        lastPara.setSpacingAfter(6);
+      } else if (built[i].text.trim() === "") {
+        lastPara = container.insertParagraph(insertAt, "");
+      } else {
+        lastPara = container.insertParagraph(insertAt, built[i].text);
+      }
+    }
+
+    if (!placeholderIsAloneOnLine && after) {
+      lastPara.asText().appendText(after);
+    }
+
+    result = container.findText(searchPattern);
+  }
 }
 
 // Used for filenames, e.g. "Employment Contract - {{EmployeeName}}"
