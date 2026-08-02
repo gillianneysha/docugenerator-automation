@@ -38,6 +38,7 @@ function validatePlaceholders_(docId, sourceSheetName) {
   const derivedKeys = Object.values(CLAUSE_OPTION_COLUMNS).concat([
     "day",
     "month",
+    "HMO_CLAUSE",
   ]);
 
   const unknown = placeholders.filter(
@@ -127,7 +128,9 @@ function listTemplateNames() {
 }
 
 function findActiveTemplateByName_(name) {
-  return getTemplateRegistry_().find((r) => r["Template Name"] === name) || null;
+  return (
+    getTemplateRegistry_().find((r) => r["Template Name"] === name) || null
+  );
 }
 
 function revalidateAllTemplates_UI() {
