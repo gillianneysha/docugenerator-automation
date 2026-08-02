@@ -465,6 +465,7 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       } else {
         text.setText(built[0].text);
         lastPara = para;
+        if (built.length > 1) lastPara.setSpacingAfter(6);
       }
     } else {
       // Placeholder shares its line with other text — keep that text in
@@ -476,6 +477,7 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         text.deleteText(afterStart, afterStart + after.length - 1);
       }
       lastPara = para;
+      if (built.length > 1) lastPara.setSpacingAfter(6);
     }
 
     for (let i = 1; i < built.length; i++) {
@@ -491,6 +493,7 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         lastPara = container.insertParagraph(insertAt, "");
       } else {
         lastPara = container.insertParagraph(insertAt, built[i].text);
+        lastPara.setSpacingAfter(6);
       }
     }
 
