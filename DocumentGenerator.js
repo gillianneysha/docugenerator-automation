@@ -407,6 +407,8 @@ function normalizeInlineBullets_(value) {
 }
 
 function replaceMultilinePlaceholder_(container, placeholder, value) {
+  const MIN_SPACING_AFTER = 8; // safety net only, if the template paragraph has 0pt spacing set
+
   const lines = value.split("\n");
   const searchPattern = escapeRegex_(placeholder);
 
@@ -429,18 +431,35 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       para = para.getParent();
     }
 
-    if (!para || para.getParent() !== container) {
-      // Inside a table cell or other nested container — can't insert real
-      // paragraphs there, so join lines with a soft line break instead.
+    // Insert into whatever directly holds this paragraph — Body, a
+    // TableCell, HeaderSection, and FooterSection all support
+    // insertParagraph/insertListItem/getChildIndex the same way, so a
+    // placeholder inside a table cell gets real paragraphs too, instead of
+    // falling back to a soft line break.
+    const insertionContainer = para ? para.getParent() : null;
+    const canInsert =
+      insertionContainer &&
+      typeof insertionContainer.insertParagraph === "function";
+
+    if (!para || !canInsert) {
       text.deleteText(startOffset, endOffsetInclusive);
       text.insertText(startOffset, escapeReplacement_(lines.join("\v")));
       result = container.findText(searchPattern);
       continue;
     }
 
-    const bodyIndex = container.getChildIndex(para);
-    // True only if the placeholder is the paragraph's entire content — the
-    // common case, e.g. a template line that's just "{{Job Description}}".
+    // Copy the template author's own paragraph styling (spacing, font,
+    // alignment) so new lines match the template — controlled entirely
+    // from the Doc itself, never hardcoded in the script.
+    const templateAttributes = para.getAttributes();
+    const currentSpacing =
+      templateAttributes[DocumentApp.Attribute.SPACING_AFTER];
+    if (!currentSpacing || currentSpacing < MIN_SPACING_AFTER) {
+      templateAttributes[DocumentApp.Attribute.SPACING_AFTER] =
+        MIN_SPACING_AFTER;
+    }
+
+    const bodyIndex = insertionContainer.getChildIndex(para);
     const placeholderIsAloneOnLine =
       before.trim() === "" && after.trim() === "";
 
@@ -453,21 +472,17 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
     let lastPara;
 
     if (placeholderIsAloneOnLine) {
-      // Nothing else shares this paragraph — repurpose it directly instead
-      // of leaving a stray plain paragraph in front of the real content.
       if (built[0].bullet) {
-        lastPara = container.insertListItem(bodyIndex, built[0].text);
+        lastPara = insertionContainer.insertListItem(bodyIndex, built[0].text);
         lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
-        lastPara.setSpacingAfter(6);
+        if (built.length > 1) lastPara.setAttributes(templateAttributes);
         para.removeFromParent();
       } else {
         text.setText(built[0].text);
         lastPara = para;
-        if (built.length > 1) lastPara.setSpacingAfter(6);
+        if (built.length > 1) lastPara.setAttributes(templateAttributes);
       }
     } else {
-      // Placeholder shares its line with other text — keep that text in
-      // place and just swap the placeholder for the first output line.
       text.deleteText(startOffset, endOffsetInclusive);
       text.insertText(startOffset, built[0].text);
       if (after) {
@@ -475,23 +490,20 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         text.deleteText(afterStart, afterStart + after.length - 1);
       }
       lastPara = para;
-      if (built.length > 1) lastPara.setSpacingAfter(6);
+      if (built.length > 1) lastPara.setAttributes(templateAttributes);
     }
 
     for (let i = 1; i < built.length; i++) {
       insertAt++;
       if (built[i].bullet) {
-        lastPara = container.insertListItem(insertAt, built[i].text);
+        lastPara = insertionContainer.insertListItem(insertAt, built[i].text);
         lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
-        // Guaranteed breathing room between bullets, regardless of whether
-        // the sheet cell had a blank line between them — don't rely on
-        // exact source formatting for visible spacing.
-        lastPara.setSpacingAfter(6);
+        lastPara.setAttributes(templateAttributes);
       } else if (built[i].text.trim() === "") {
-        lastPara = container.insertParagraph(insertAt, "");
+        lastPara = insertionContainer.insertParagraph(insertAt, "");
       } else {
-        lastPara = container.insertParagraph(insertAt, built[i].text);
-        lastPara.setSpacingAfter(6);
+        lastPara = insertionContainer.insertParagraph(insertAt, built[i].text);
+        lastPara.setAttributes(templateAttributes);
       }
     }
 
