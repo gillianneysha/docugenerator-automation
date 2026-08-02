@@ -422,6 +422,12 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
     const before = fullText.substring(0, startOffset);
     const after = fullText.substring(endOffsetInclusive + 1);
 
+    // Capture the placeholder's OWN character-level formatting (color,
+    // highlight, bold, font) directly from the text run, before anything
+    // gets modified. Paragraph-level attributes alone don't reliably carry
+    // an explicit run override like a highlight color.
+    const runAttributes = text.getAttributes(startOffset);
+
     let para = element.getParent();
     while (
       para &&
@@ -431,11 +437,6 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       para = para.getParent();
     }
 
-    // Insert into whatever directly holds this paragraph — Body, a
-    // TableCell, HeaderSection, and FooterSection all support
-    // insertParagraph/insertListItem/getChildIndex the same way, so a
-    // placeholder inside a table cell gets real paragraphs too, instead of
-    // falling back to a soft line break.
     const insertionContainer = para ? para.getParent() : null;
     const canInsert =
       insertionContainer &&
@@ -448,10 +449,14 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       continue;
     }
 
-    // Copy the template author's own paragraph styling (spacing, font,
-    // alignment) so new lines match the template — controlled entirely
-    // from the Doc itself, never hardcoded in the script.
-    const templateAttributes = para.getAttributes();
+    // Combine: paragraph-level spacing/alignment from the paragraph itself,
+    // character-level styling (color, bold, highlight, font) from the run —
+    // both sourced from the template, none hardcoded.
+    const templateAttributes = Object.assign(
+      {},
+      para.getAttributes(),
+      runAttributes,
+    );
     const currentSpacing =
       templateAttributes[DocumentApp.Attribute.SPACING_AFTER];
     if (!currentSpacing || currentSpacing < MIN_SPACING_AFTER) {
@@ -475,22 +480,30 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       if (built[0].bullet) {
         lastPara = insertionContainer.insertListItem(bodyIndex, built[0].text);
         lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
-        if (built.length > 1) lastPara.setAttributes(templateAttributes);
+        lastPara.setAttributes(templateAttributes);
         para.removeFromParent();
       } else {
         text.setText(built[0].text);
+        // setText() resets this run's character formatting — restore it.
+        text.setAttributes(templateAttributes);
         lastPara = para;
         if (built.length > 1) lastPara.setAttributes(templateAttributes);
       }
     } else {
       text.deleteText(startOffset, endOffsetInclusive);
       text.insertText(startOffset, built[0].text);
+      if (built[0].text.length > 0) {
+        text.setAttributes(
+          startOffset,
+          startOffset + built[0].text.length - 1,
+          templateAttributes,
+        );
+      }
       if (after) {
         const afterStart = startOffset + built[0].text.length;
         text.deleteText(afterStart, afterStart + after.length - 1);
       }
       lastPara = para;
-      if (built.length > 1) lastPara.setAttributes(templateAttributes);
     }
 
     for (let i = 1; i < built.length; i++) {
@@ -501,6 +514,7 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         lastPara.setAttributes(templateAttributes);
       } else if (built[i].text.trim() === "") {
         lastPara = insertionContainer.insertParagraph(insertAt, "");
+        lastPara.setAttributes(templateAttributes);
       } else {
         lastPara = insertionContainer.insertParagraph(insertAt, built[i].text);
         lastPara.setAttributes(templateAttributes);
