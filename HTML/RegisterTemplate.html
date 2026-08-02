@@ -58,7 +58,16 @@
       function populateSheets(names) {
         const select = document.getElementById("sourceSheet");
         names.forEach((n) => {
-          if (["Template Registry", "Settings", "Logs"].includes(n)) return;
+          if (
+          [
+            "Template Registry",
+            "Settings",
+            "Logs",
+            "Logs Archive",
+            "Clause Library",
+          ].includes(n)
+        )
+          return;
           const opt = document.createElement("option");
           opt.value = n;
           opt.textContent = n;

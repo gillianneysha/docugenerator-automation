@@ -193,13 +193,6 @@
           values.length + " distinct value(s)";
       }
 
-      function toggleSelectAll() {
-        const checked = document.getElementById("selectAll").checked;
-        document
-          .querySelectorAll(".row-cb")
-          .forEach((cb) => (cb.checked = checked));
-      }
-
       function toggleRowPicker() {
         const mode = document.getElementById("rowMode").value;
         document.getElementById("rowPicker").style.display =
@@ -208,9 +201,21 @@
           mode === "filtered" ? "block" : "none";
       }
 
-      function getCheckedRows() {
-        return Array.from(document.querySelectorAll(".row-cb:checked")).map(
-          (cb) => Number(cb.value),
+      const BATCH_WARNING_THRESHOLD = 100;
+
+      function confirmLargeBatch(count) {
+        if (count <= BATCH_WARNING_THRESHOLD) return true;
+        return confirm(
+          "This will generate " +
+            count +
+            " documents. Large batches can occasionally hit Google's execution " +
+            "time limit and stop partway through (already-generated files stay valid, but the rest won't run).\n\n" +
+            "Recommended: split into batches of ~" +
+            BATCH_WARNING_THRESHOLD +
+            " using row numbers or a filter.\n\n" +
+            "Continue anyway with all " +
+            count +
+            "?",
         );
       }
 
@@ -230,6 +235,7 @@
               '<span class="error">Enter at least one row number (e.g. 2,5,9-12).</span>';
             return;
           }
+          if (!confirmLargeBatch(selectedRows.length)) return;
           runGenerate(
             templateName,
             "selected",
@@ -254,6 +260,10 @@
                   '<span class="error">No rows match that filter.</span>';
                 return;
               }
+              if (!confirmLargeBatch(rows.length)) {
+                document.getElementById("results").innerHTML = "";
+                return;
+              }
               runGenerate(
                 templateName,
                 "selected",
@@ -265,7 +275,18 @@
             .withFailureHandler(showFailure)
             .getFilteredRows_UI(templateName, column, value);
         } else {
-          runGenerate(templateName, "all", [], outputFormat, nameTemplate);
+          document.getElementById("results").innerHTML =
+            "Checking row count...";
+          google.script.run
+            .withSuccessHandler((count) => {
+              if (!confirmLargeBatch(count)) {
+                document.getElementById("results").innerHTML = "";
+                return;
+              }
+              runGenerate(templateName, "all", [], outputFormat, nameTemplate);
+            })
+            .withFailureHandler(showFailure)
+            .getTemplateRowCount_UI(templateName);
         }
       }
 

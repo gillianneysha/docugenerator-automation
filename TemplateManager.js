@@ -31,9 +31,20 @@ function validatePlaceholders_(docId, sourceSheetName) {
   const placeholders = scanPlaceholders_(docId);
   const { headers } = getSheetDataAsObjects_(sourceSheetName);
   const settingsKeys = Object.keys(getAllSettings_());
+  // Fields computed at generation time (DocumentGenerator.js) rather than
+  // read directly from a sheet column — e.g. {{ACCRUAL}} resolved from the
+  // Clause Library, or {{day}}/{{month}} derived from CREATE DATE. These are
+  // legitimate placeholders even though no column has that exact name.
+  const derivedKeys = Object.values(CLAUSE_OPTION_COLUMNS).concat([
+    "day",
+    "month",
+  ]);
 
   const unknown = placeholders.filter(
-    (p) => !headers.includes(p) && !settingsKeys.includes(p),
+    (p) =>
+      !headers.includes(p) &&
+      !settingsKeys.includes(p) &&
+      !derivedKeys.includes(p),
   );
   return {
     valid: unknown.length === 0,
