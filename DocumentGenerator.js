@@ -368,10 +368,11 @@ function replaceAllPlaceholdersInDoc_(doc, rowData) {
   Object.keys(rowData).forEach((key) => {
     if (key === "__row") return;
     const placeholder = "{{" + key + "}}";
-    const rawValue =
+    const rawValue = normalizeInlineBullets_(
       rowData[key] === null || rowData[key] === undefined
         ? ""
-        : String(rowData[key]).replace(/\r\n/g, "\n");
+        : String(rowData[key]).replace(/\r\n/g, "\n"),
+    );
 
     if (rawValue.indexOf("\n") === -1) {
       // Fast path: single-line value, plain inline text swap.
@@ -397,6 +398,14 @@ function replaceAllPlaceholdersInDoc_(doc, rowData) {
 // isn't swallowed.
 function escapeReplacement_(str) {
   return str.replace(/\$/g, "$$$$");
+}
+
+// Some sheet cells use a bullet character typed inline ("...text.  • Next
+// item") instead of an actual line break (Alt+Enter) before each bullet.
+// Insert a real newline before every "•" so those still become real Docs
+// bullets, even without a literal line break in the source cell.
+function normalizeInlineBullets_(value) {
+  return value.replace(/\s*•\s*/g, "\n• ").replace(/^\n/, "");
 }
 
 function replaceMultilinePlaceholder_(container, placeholder, value) {
