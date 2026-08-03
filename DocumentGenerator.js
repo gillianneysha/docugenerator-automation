@@ -512,6 +512,10 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         const oldPlaceholderEnd =
           oldPlaceholderStart + (endOffsetInclusive - startOffset);
         text.deleteText(oldPlaceholderStart, oldPlaceholderEnd);
+        // Order matters: paragraph-level attributes must be applied BEFORE
+        // character-level ones, or setting paragraph attributes afterward
+        // resets the run-level highlight/bold that was just applied.
+        para.setAttributes(paragraphAttributes);
         if (built[0].text.length > 0) {
           text.setAttributes(
             startOffset,
@@ -519,7 +523,6 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
             runAttributes,
           );
         }
-        para.setAttributes(paragraphAttributes);
         lastPara = para;
       }
     } else {
