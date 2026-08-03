@@ -427,6 +427,12 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
     // gets modified. Paragraph-level attributes alone don't reliably carry
     // an explicit run override like a highlight color.
     const runAttributes = text.getAttributes(startOffset);
+    Logger.log(
+      "DEBUG placeholder='" +
+        placeholder +
+        "' runAttributes=" +
+        JSON.stringify(runAttributes),
+    );
 
     let para = element.getParent();
     while (
@@ -438,6 +444,10 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
     }
 
     const insertionContainer = para ? para.getParent() : null;
+    Logger.log(
+      "DEBUG paraAttributes=" +
+        JSON.stringify(para ? para.getAttributes() : null),
+    );
     const canInsert =
       insertionContainer &&
       typeof insertionContainer.insertParagraph === "function";
