@@ -483,11 +483,17 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         lastPara.setAttributes(templateAttributes);
         para.removeFromParent();
       } else {
-        // deleteText/insertText naturally inherit the surrounding run's
-        // formatting — unlike setText(), which resets it to default. No
-        // manual attribute restoration needed for this line.
-        text.deleteText(startOffset, endOffsetInclusive);
+        // Formatting is inherited from adjacent characters — if the
+        // placeholder is the ENTIRE content of this text run, deleting it
+        // first leaves nothing adjacent to inherit from, so new text falls
+        // back to plain default. Insert the new text FIRST, right next to
+        // the still-present placeholder characters, then delete the old
+        // placeholder — that way the new text has a formatted neighbor at
+        // the moment it's created.
         text.insertText(startOffset, built[0].text);
+        const oldPlaceholderStart = startOffset + built[0].text.length;
+        const oldPlaceholderEnd = oldPlaceholderStart + (endOffsetInclusive - startOffset);
+        text.deleteText(oldPlaceholderStart, oldPlaceholderEnd);
         lastPara = para;
         if (built.length > 1) lastPara.setAttributes(templateAttributes);
       }
