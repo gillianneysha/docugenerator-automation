@@ -509,6 +509,7 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
           );
         }
         lastPara = para;
+        lastPara.setAttributes(templateAttributes);
       }
     } else {
       text.deleteText(startOffset, endOffsetInclusive);
@@ -532,14 +533,17 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       if (built[i].bullet) {
         lastPara = insertionContainer.insertListItem(insertAt, built[i].text);
         lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
-        lastPara.editAsText().setAttributes(templateAttributes);
       } else if (built[i].text.trim() === "") {
         lastPara = insertionContainer.insertParagraph(insertAt, "");
-        lastPara.editAsText().setAttributes(templateAttributes);
       } else {
         lastPara = insertionContainer.insertParagraph(insertAt, built[i].text);
-        lastPara.editAsText().setAttributes(templateAttributes);
       }
+      // Apply BOTH levels explicitly: paragraph-level (spacing, alignment,
+      // indent) via the Paragraph/ListItem object, and character-level
+      // (bold, highlight, font, color) via its Text object. Neither alone
+      // reliably covers both categories.
+      lastPara.setAttributes(templateAttributes);
+      lastPara.editAsText().setAttributes(templateAttributes);
     }
 
     if (!placeholderIsAloneOnLine && after) {
