@@ -483,9 +483,11 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         lastPara.setAttributes(templateAttributes);
         para.removeFromParent();
       } else {
-        text.setText(built[0].text);
-        // setText() resets this run's character formatting — restore it.
-        text.setAttributes(templateAttributes);
+        // deleteText/insertText naturally inherit the surrounding run's
+        // formatting — unlike setText(), which resets it to default. No
+        // manual attribute restoration needed for this line.
+        text.deleteText(startOffset, endOffsetInclusive);
+        text.insertText(startOffset, built[0].text);
         lastPara = para;
         if (built.length > 1) lastPara.setAttributes(templateAttributes);
       }
