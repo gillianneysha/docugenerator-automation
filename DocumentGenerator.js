@@ -301,6 +301,7 @@ const CLAUSE_OPTION_COLUMNS = {
   "CARRYOVER OPTION": "CARRYOVER",
   "LEAVE USAGE OPTION": "LEAVE_USAGE",
   "HMO OPTION": "HMO",
+  "HMO CLAUSE OPTION": "HMO_CLAUSE",   // ← Remofirst-specific HMO
   "BUSINESS TOOLS OPTION": "BUSINESS_TOOLS",
 };
 
@@ -345,6 +346,53 @@ function deriveClauseFields_(rowData) {
     if (text !== null) derived[clauseKey] = text;
   });
   return derived;
+}
+
+// Remofirst-style HMO input: unlike CLAUSE_OPTION_COLUMNS (one column -> one
+// Clause Library option code), this sheet spreads the HMO choice across
+// four columns (HAS HMO / HMO EFFECTIVE OPTION / HMO COVERAGE OPTION /
+// HMO EFFECTIVE MONTHS). This maps those four into the matching Clause
+// Library "HMO" option code (NO, or 1-6), then resolves it the normal way.
+// {{HMO MBL}} and {{HMO EFFECTIVE MONTHS}} inside the resolved clause text
+// are filled automatically by resolveClauseText_ since they're already
+// columns in rowData.
+function resolveHmoOptionCode_(rowData) {
+  const hasHmo = String(rowData["HAS HMO"] || "")
+    .trim()
+    .toUpperCase();
+  if (hasHmo !== "YES") return "NO";
+
+  const effective = String(rowData["HMO EFFECTIVE OPTION"] || "")
+    .trim()
+    .toUpperCase();
+  const coverage = String(rowData["HMO COVERAGE OPTION"] || "")
+    .trim()
+    .toUpperCase();
+
+  const principalOnly = coverage === "PRINCIPAL ONLY";
+  const withDependents = coverage === "PRINCIPAL + DEPENDENTS";
+
+  if (effective === "FIRST DAY") {
+    if (principalOnly) return "1";
+    if (withDependents) return "2";
+  } else if (effective === "REGULARIZATION") {
+    if (principalOnly) return "3";
+    if (withDependents) return "4";
+  } else if (effective === "AFTER MONTHS") {
+    if (principalOnly) return "5";
+    if (withDependents) return "6";
+  }
+  // Unrecognized combination -> caller gets null and leaves {{HMO_CLAUSE}}
+  // untouched, rather than silently guessing.
+  return null;
+}
+
+function deriveHmoClauseField_(rowData) {
+  if (!("HAS HMO" in rowData)) return {}; // sheet doesn't use this pattern
+  const optionCode = resolveHmoOptionCode_(rowData);
+  if (optionCode === null) return {};
+  const text = resolveClauseText_("HMO", optionCode, rowData);
+  return text !== null ? { HMO_CLAUSE: text } : {};
 }
 
 function deriveDateFields_(rowData) {
