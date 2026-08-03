@@ -294,15 +294,28 @@ function generateSingleDocument_(
 }
 
 // Maps a source-sheet "option" column to the Clause Key it resolves against
-// in the Clause Library sheet. Add a line here whenever a new {{OPTION}}
-// column + clause key pair is introduced.
-const CLAUSE_OPTION_COLUMNS = {
-  "ACCRUAL OPTION": "ACCRUAL",
-  "CARRYOVER OPTION": "CARRYOVER",
-  "LEAVE USAGE OPTION": "LEAVE_USAGE",
-  "HMO OPTION": "HMO",
-  "BUSINESS TOOLS OPTION": "BUSINESS_TOOLS",
-};
+// in the Clause Library sheet. Read from the "Clause Key Registry" sheet at
+// runtime so HR can add new clause types (new column + new clause key) via
+// the sheet, without a code change. Cached for the lifetime of one execution,
+// same pattern as getClauseLibrary_().
+let clauseOptionColumnsCache_ = null;
+function getClauseOptionColumns_() {
+  if (clauseOptionColumnsCache_ === null) {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(
+      "Clause Key Registry",
+    );
+    const map = {};
+    if (sheet) {
+      getSheetDataAsObjects_("Clause Key Registry").rows.forEach((r) => {
+        const col = String(r["Option Column"] || "").trim();
+        const key = String(r["Clause Key"] || "").trim();
+        if (col && key) map[col] = key;
+      });
+    }
+    clauseOptionColumnsCache_ = map;
+  }
+  return clauseOptionColumnsCache_;
+}
 
 // Cached for the lifetime of one execution (i.e. one Generate click, however
 // many rows it covers) so the 989-row Clause Library isn't re-fetched per row.
@@ -339,8 +352,9 @@ function resolveClauseText_(clauseKey, optionValue, rowData) {
 
 function deriveClauseFields_(rowData) {
   const derived = {};
-  Object.keys(CLAUSE_OPTION_COLUMNS).forEach((column) => {
-    const clauseKey = CLAUSE_OPTION_COLUMNS[column];
+  const clauseOptionColumns = getClauseOptionColumns_();
+  Object.keys(clauseOptionColumns).forEach((column) => {
+    const clauseKey = clauseOptionColumns[column];
     const text = resolveClauseText_(clauseKey, rowData[column], rowData);
     if (text !== null) derived[clauseKey] = text;
   });

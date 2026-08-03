@@ -35,7 +35,7 @@ function validatePlaceholders_(docId, sourceSheetName) {
   // read directly from a sheet column — e.g. {{ACCRUAL}} resolved from the
   // Clause Library, or {{day}}/{{month}} derived from CREATE DATE. These are
   // legitimate placeholders even though no column has that exact name.
-  const derivedKeys = Object.values(CLAUSE_OPTION_COLUMNS).concat([
+  const derivedKeys = Object.values(getClauseOptionColumns_()).concat([
     "day",
     "month",
     "HMO_CLAUSE",
