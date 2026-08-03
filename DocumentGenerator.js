@@ -490,22 +490,25 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       if (built[0].bullet) {
         lastPara = insertionContainer.insertListItem(bodyIndex, built[0].text);
         lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
-        lastPara.setAttributes(templateAttributes);
+        lastPara.editAsText().setAttributes(templateAttributes);
         para.removeFromParent();
       } else {
-        // Formatting is inherited from adjacent characters — if the
-        // placeholder is the ENTIRE content of this text run, deleting it
-        // first leaves nothing adjacent to inherit from, so new text falls
-        // back to plain default. Insert the new text FIRST, right next to
-        // the still-present placeholder characters, then delete the old
-        // placeholder — that way the new text has a formatted neighbor at
-        // the moment it's created.
         text.insertText(startOffset, built[0].text);
         const oldPlaceholderStart = startOffset + built[0].text.length;
         const oldPlaceholderEnd = oldPlaceholderStart + (endOffsetInclusive - startOffset);
         text.deleteText(oldPlaceholderStart, oldPlaceholderEnd);
+        // Apply formatting via the TEXT object with an explicit range, not
+        // Paragraph.setAttributes() — calling setAttributes() directly on a
+        // Paragraph does not reliably cascade run-level formatting (bold,
+        // highlight, font) into its text the way the Text object does.
+        if (built[0].text.length > 0) {
+          text.setAttributes(
+            startOffset,
+            startOffset + built[0].text.length - 1,
+            templateAttributes,
+          );
+        }
         lastPara = para;
-        if (built.length > 1) lastPara.setAttributes(templateAttributes);
       }
     } else {
       text.deleteText(startOffset, endOffsetInclusive);
@@ -529,13 +532,13 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       if (built[i].bullet) {
         lastPara = insertionContainer.insertListItem(insertAt, built[i].text);
         lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
-        lastPara.setAttributes(templateAttributes);
+        lastPara.editAsText().setAttributes(templateAttributes);
       } else if (built[i].text.trim() === "") {
         lastPara = insertionContainer.insertParagraph(insertAt, "");
-        lastPara.setAttributes(templateAttributes);
+        lastPara.editAsText().setAttributes(templateAttributes);
       } else {
         lastPara = insertionContainer.insertParagraph(insertAt, built[i].text);
-        lastPara.setAttributes(templateAttributes);
+        lastPara.editAsText().setAttributes(templateAttributes);
       }
     }
 
