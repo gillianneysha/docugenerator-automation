@@ -307,7 +307,7 @@ function getClauseOptionColumns_() {
     const map = {};
     if (sheet) {
       getSheetDataAsObjects_("Clause Key Registry").rows.forEach((r) => {
-        const col = String(r["Option Column"] || "").trim();
+        const col = String(r["Option"] || "").trim();
         const key = String(r["Clause Key"] || "").trim();
         if (col && key) map[col] = key;
       });
