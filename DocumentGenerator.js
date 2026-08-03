@@ -406,8 +406,22 @@ function normalizeInlineBullets_(value) {
   return value.replace(/\s*•\s*/g, "\n• ").replace(/^\n/, "");
 }
 
+// Attribute keys that belong to the paragraph itself (spacing, alignment,
+// indentation) as opposed to character-level run formatting.
+const PARAGRAPH_LEVEL_ATTRIBUTE_KEYS = [
+  DocumentApp.Attribute.HEADING,
+  DocumentApp.Attribute.HORIZONTAL_ALIGNMENT,
+  DocumentApp.Attribute.INDENT_END,
+  DocumentApp.Attribute.INDENT_FIRST_LINE,
+  DocumentApp.Attribute.INDENT_START,
+  DocumentApp.Attribute.LEFT_TO_RIGHT,
+  DocumentApp.Attribute.LINE_SPACING,
+  DocumentApp.Attribute.SPACING_AFTER,
+  DocumentApp.Attribute.SPACING_BEFORE,
+];
+
 function replaceMultilinePlaceholder_(container, placeholder, value) {
-  const MIN_SPACING_AFTER = 8; // safety net only, if the template paragraph has 0pt spacing set
+  const MIN_SPACING_AFTER = 8;
 
   const lines = value.split("\n");
   const searchPattern = escapeRegex_(placeholder);
@@ -422,17 +436,9 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
     const before = fullText.substring(0, startOffset);
     const after = fullText.substring(endOffsetInclusive + 1);
 
-    // Capture the placeholder's OWN character-level formatting (color,
-    // highlight, bold, font) directly from the text run, before anything
-    // gets modified. Paragraph-level attributes alone don't reliably carry
-    // an explicit run override like a highlight color.
+    // Character-level formatting (bold, highlight, font, color) — read from
+    // the placeholder's own text run.
     const runAttributes = text.getAttributes(startOffset);
-    Logger.log(
-      "DEBUG placeholder='" +
-        placeholder +
-        "' runAttributes=" +
-        JSON.stringify(runAttributes),
-    );
 
     let para = element.getParent();
     while (
@@ -444,10 +450,6 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
     }
 
     const insertionContainer = para ? para.getParent() : null;
-    Logger.log(
-      "DEBUG paraAttributes=" +
-        JSON.stringify(para ? para.getAttributes() : null),
-    );
     const canInsert =
       insertionContainer &&
       typeof insertionContainer.insertParagraph === "function";
@@ -459,18 +461,19 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       continue;
     }
 
-    // Combine: paragraph-level spacing/alignment from the paragraph itself,
-    // character-level styling (color, bold, highlight, font) from the run —
-    // both sourced from the template, none hardcoded.
-    const templateAttributes = Object.assign(
-      {},
-      para.getAttributes(),
-      runAttributes,
-    );
-    const currentSpacing =
-      templateAttributes[DocumentApp.Attribute.SPACING_AFTER];
-    if (!currentSpacing || currentSpacing < MIN_SPACING_AFTER) {
-      templateAttributes[DocumentApp.Attribute.SPACING_AFTER] =
+    // Paragraph-level formatting (spacing, alignment, indent) — read
+    // separately, and ONLY these keys, from the paragraph itself.
+    const fullParaAttributes = para.getAttributes();
+    const paragraphAttributes = {};
+    PARAGRAPH_LEVEL_ATTRIBUTE_KEYS.forEach((key) => {
+      paragraphAttributes[key] = fullParaAttributes[key];
+    });
+    if (
+      !paragraphAttributes[DocumentApp.Attribute.SPACING_AFTER] ||
+      paragraphAttributes[DocumentApp.Attribute.SPACING_AFTER] <
+        MIN_SPACING_AFTER
+    ) {
+      paragraphAttributes[DocumentApp.Attribute.SPACING_AFTER] =
         MIN_SPACING_AFTER;
     }
 
@@ -483,6 +486,17 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       return { bullet: !!m, text: m ? m[1] : line };
     });
 
+    // Applies character-level formatting to a newly-created paragraph/list
+    // item's full text range, plus paragraph-level formatting to the
+    // element itself. Kept as two separate calls — mixing both categories
+    // into one setAttributes() call on a Paragraph is unreliable.
+    function applyTemplateFormatting(paraOrListItem) {
+      paraOrListItem.setAttributes(paragraphAttributes);
+      const t = paraOrListItem.editAsText();
+      const len = t.getText().length;
+      if (len > 0) t.setAttributes(0, len - 1, runAttributes);
+    }
+
     let insertAt = bodyIndex;
     let lastPara;
 
@@ -490,26 +504,23 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       if (built[0].bullet) {
         lastPara = insertionContainer.insertListItem(bodyIndex, built[0].text);
         lastPara.setGlyphType(DocumentApp.GlyphType.BULLET);
-        lastPara.editAsText().setAttributes(templateAttributes);
+        applyTemplateFormatting(lastPara);
         para.removeFromParent();
       } else {
         text.insertText(startOffset, built[0].text);
         const oldPlaceholderStart = startOffset + built[0].text.length;
-        const oldPlaceholderEnd = oldPlaceholderStart + (endOffsetInclusive - startOffset);
+        const oldPlaceholderEnd =
+          oldPlaceholderStart + (endOffsetInclusive - startOffset);
         text.deleteText(oldPlaceholderStart, oldPlaceholderEnd);
-        // Apply formatting via the TEXT object with an explicit range, not
-        // Paragraph.setAttributes() — calling setAttributes() directly on a
-        // Paragraph does not reliably cascade run-level formatting (bold,
-        // highlight, font) into its text the way the Text object does.
         if (built[0].text.length > 0) {
           text.setAttributes(
             startOffset,
             startOffset + built[0].text.length - 1,
-            templateAttributes,
+            runAttributes,
           );
         }
+        para.setAttributes(paragraphAttributes);
         lastPara = para;
-        lastPara.setAttributes(templateAttributes);
       }
     } else {
       text.deleteText(startOffset, endOffsetInclusive);
@@ -518,7 +529,7 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
         text.setAttributes(
           startOffset,
           startOffset + built[0].text.length - 1,
-          templateAttributes,
+          runAttributes,
         );
       }
       if (after) {
@@ -538,12 +549,7 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
       } else {
         lastPara = insertionContainer.insertParagraph(insertAt, built[i].text);
       }
-      // Apply BOTH levels explicitly: paragraph-level (spacing, alignment,
-      // indent) via the Paragraph/ListItem object, and character-level
-      // (bold, highlight, font, color) via its Text object. Neither alone
-      // reliably covers both categories.
-      lastPara.setAttributes(templateAttributes);
-      lastPara.editAsText().setAttributes(templateAttributes);
+      applyTemplateFormatting(lastPara);
     }
 
     if (!placeholderIsAloneOnLine && after) {
@@ -553,7 +559,6 @@ function replaceMultilinePlaceholder_(container, placeholder, value) {
     result = container.findText(searchPattern);
   }
 }
-
 // Used for filenames, e.g. "Employment Contract - {{EmployeeName}}"
 function fillPlaceholders_(templateString, rowData) {
   return templateString.replace(/{{\s*([^{}]+?)\s*}}/g, (match, rawKey) => {
