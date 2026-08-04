@@ -41,6 +41,15 @@
       #filterPicker label {
         font-weight: normal;
       }
+      #autoNamingPreview {
+        margin-top: 6px;
+        color: #555;
+        font-size: 12px;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        padding: 6px;
+        border-radius: 3px;
+      }
     </style>
   </head>
   <body>
@@ -89,8 +98,22 @@
       <option value="both">Both</option>
     </select>
 
-    <label>File Name Pattern</label>
-    <input id="nameTemplate" placeholder="e.g. {{EMPLOYEE NAME}} - Contract" />
+    <label>File Naming</label>
+    <select id="namingMode" onchange="toggleNamingMode()">
+      <option value="auto">Automatic (recommended)</option>
+      <option value="custom">Custom Pattern</option>
+    </select>
+
+    <div id="autoNamingPreview">
+      Pattern: {{CLIENT NAME}} - {{EMPLOYEE NAME}}
+    </div>
+
+    <div id="customNamingWrap" style="display: none; margin-top: 8px">
+      <input
+        id="nameTemplate"
+        placeholder="e.g. {{EMPLOYEE NAME}} - Contract"
+      />
+    </div>
 
     <button onclick="generate()">Generate</button>
     <div id="results"></div>
@@ -111,6 +134,7 @@
         });
         if (names.length) loadRows();
         toggleRowPicker();
+        toggleNamingMode();
       }
 
       function loadRows() {
@@ -125,6 +149,7 @@
           .withSuccessHandler(renderColumnDropdown)
           .withFailureHandler(showFailure)
           .getTemplateHeaders_UI(templateName);
+        updateAutoNamingPreview();
       }
 
       function renderRows(rows) {
@@ -201,6 +226,48 @@
           mode === "filtered" ? "block" : "none";
       }
 
+      // --- File naming ---------------------------------------------------
+      // Templates whose name contains "remofirst" (case-insensitive) get a
+      // "Remofirst - " prefix on the auto-generated file name. Everything
+      // else uses the plain Client/Employee pattern. Update this in one
+      // place if the naming rule ever changes.
+      let currentAutoPattern = "{{CLIENT NAME}} - {{EMPLOYEE NAME}}";
+
+      function toggleNamingMode() {
+        const mode = document.getElementById("namingMode").value;
+        document.getElementById("customNamingWrap").style.display =
+          mode === "custom" ? "block" : "none";
+        document.getElementById("autoNamingPreview").style.display =
+          mode === "auto" ? "block" : "none";
+        updateAutoNamingPreview();
+      }
+
+      function updateAutoNamingPreview() {
+        const templateName = document.getElementById("templateName").value;
+        if (!templateName) return;
+        document.getElementById("autoNamingPreview").textContent =
+          "Loading pattern...";
+        google.script.run
+          .withSuccessHandler((pattern) => {
+            currentAutoPattern = pattern;
+            document.getElementById("autoNamingPreview").textContent =
+              "Pattern: " + pattern;
+          })
+          .withFailureHandler(showFailure)
+          .getNamingPattern_UI(templateName);
+      }
+
+      function getSelectedNameTemplate() {
+        const namingMode = document.getElementById("namingMode").value;
+        if (namingMode === "custom") {
+          return (
+            document.getElementById("nameTemplate").value.trim() ||
+            currentAutoPattern
+          );
+        }
+        return currentAutoPattern;
+      }
+
       const BATCH_WARNING_THRESHOLD = 100;
 
       function confirmLargeBatch(count) {
@@ -223,8 +290,7 @@
         const templateName = document.getElementById("templateName").value;
         const rowMode = document.getElementById("rowMode").value;
         const outputFormat = document.getElementById("outputFormat").value;
-        const nameTemplate =
-          document.getElementById("nameTemplate").value || "{{Employee Name}}";
+        const nameTemplate = getSelectedNameTemplate();
 
         if (rowMode === "selected") {
           const selectedRows = parseRowNumbers(

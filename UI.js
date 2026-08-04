@@ -83,6 +83,13 @@ function getTemplateRowCount_UI(templateName) {
   const template = getTemplateByName_(templateName);
   return getSheetDataAsObjects_(template["Source Sheet"]).rows.length;
 }
+function getNamingPattern_UI(templateName) {
+  const template = getTemplateByName_(templateName);
+  const DEFAULT_PATTERN = "{{CLIENT NAME}} - {{EMPLOYEE NAME}}";
+  if (!template) return DEFAULT_PATTERN;
+  const pattern = String(template["File Name Pattern"] || "").trim();
+  return pattern || DEFAULT_PATTERN;
+}
 function generateDocuments_UI(
   templateName,
   rowMode,
