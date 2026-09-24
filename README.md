@@ -29,6 +29,7 @@ This project was co-developed by **Gillianne Ysha Lim** and **Ludrein Reimar Sal
 
 - **Template Management**
   - Register templates using Google Docs.
+  - Store a required file-name pattern for each registered template.
   - Auto-scan `{{placeholder}}` tags in document templates.
   - Validate templates against spreadsheet headers and shared settings.
   - Re-validate templates on demand to catch issues before generation.
@@ -48,6 +49,14 @@ This project was co-developed by **Gillianne Ysha Lim** and **Ludrein Reimar Sal
   - Detect missing required fields and invalid placeholder references.
   - Prevent broken template registration.
   - Provide user-friendly error messages for missing folders, invalid templates, and permission issues.
+
+### Template Registry columns
+
+The `Template Registry` sheet uses this column order:
+
+`Template Name | File Name Pattern | Google Doc ID | Source Sheet | Output Folder ID | Status`
+
+Run **Document Automation > Initialize Sheets (first-time setup)** after updating an existing spreadsheet. The setup step upgrades the registry schema and repairs rows created by older versions where the status and IDs were shifted after the file-name pattern column was introduced.
 
 ## Architecture Overview
 

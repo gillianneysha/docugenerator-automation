@@ -17,13 +17,7 @@ function onOpen() {
 function initializeSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  createSheetIfMissing_(ss, "Template Registry", [
-    "Template Name",
-    "Google Doc ID",
-    "Source Sheet",
-    "Output Folder ID",
-    "Status",
-  ]);
+  ensureTemplateRegistrySchema_(ss);
   createSheetIfMissing_(ss, "Settings", ["Setting", "Value"]);
   createSheetIfMissing_(ss, "Logs", [
     "Date",

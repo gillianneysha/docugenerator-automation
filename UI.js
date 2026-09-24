@@ -68,12 +68,14 @@ function extractIdFromUrl_(url) {
 }
 function registerTemplateFromForm_UI(
   templateName,
+  fileNamePattern,
   docUrl,
   sourceSheet,
   folderUrl,
 ) {
   return registerTemplate(
     templateName,
+    fileNamePattern,
     extractIdFromUrl_(docUrl),
     sourceSheet,
     extractIdFromUrl_(folderUrl),

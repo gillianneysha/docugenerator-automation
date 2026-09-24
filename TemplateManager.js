@@ -59,11 +59,26 @@ function validatePlaceholders_(docId, sourceSheetName) {
 /**
  * Called from the Register Template sidebar.
  */
-function registerTemplate(templateName, docId, sourceSheet, outputFolderId) {
+function registerTemplate(
+  templateName,
+  fileNamePattern,
+  docId,
+  sourceSheet,
+  outputFolderId,
+) {
   const nameTrimmed = (templateName || "").trim();
+  const patternTrimmed = (fileNamePattern || "").trim();
   if (!nameTrimmed) {
     return { success: false, message: "Template name cannot be empty." };
   }
+  if (!patternTrimmed) {
+    return {
+      success: false,
+      message: "File Name Pattern cannot be empty.",
+    };
+  }
+
+  ensureTemplateRegistrySchema_(SpreadsheetApp.getActiveSpreadsheet());
 
   const allTemplates = getAllTemplateRows_();
 
@@ -112,7 +127,13 @@ function registerTemplate(templateName, docId, sourceSheet, outputFolderId) {
         '" or a Settings key.',
     };
   }
-  addTemplateToRegistry_(nameTrimmed, docId, sourceSheet, outputFolderId);
+  addTemplateToRegistry_(
+    nameTrimmed,
+    patternTrimmed,
+    docId,
+    sourceSheet,
+    outputFolderId,
+  );
   return {
     success: true,
     message:

@@ -40,6 +40,12 @@
     <label>Template Name</label>
     <input id="templateName" placeholder="e.g. Employment Contract" />
 
+    <label>File Name Pattern</label>
+    <input
+      id="fileNamePattern"
+      placeholder="e.g. {{CLIENT NAME}} - {{EMPLOYEE NAME}}"
+    />
+
     <label>Google Doc URL (the template you want to register)</label>
     <input id="docUrl" placeholder="Paste the Google Doc link" />
 
@@ -79,9 +85,18 @@
         const templateName = document
           .getElementById("templateName")
           .value.trim();
+        const fileNamePattern = document
+          .getElementById("fileNamePattern")
+          .value.trim();
         const docUrl = document.getElementById("docUrl").value.trim();
         const sourceSheet = document.getElementById("sourceSheet").value;
         const folderUrl = document.getElementById("folderUrl").value.trim();
+        if (!fileNamePattern) {
+          document.getElementById("msg").textContent =
+            "File Name Pattern cannot be empty.";
+          document.getElementById("msg").className = "error";
+          return;
+        }
         document.getElementById("msg").textContent = "Checking placeholders...";
         document.getElementById("msg").className = "";
 
@@ -90,6 +105,7 @@
           .withFailureHandler(showError)
           .registerTemplateFromForm_UI(
             templateName,
+            fileNamePattern,
             docUrl,
             sourceSheet,
             folderUrl,

@@ -3,6 +3,83 @@
  * All reading/writing of sheet data lives here.
  */
 
+const TEMPLATE_REGISTRY_HEADERS_ = [
+  "Template Name",
+  "File Name Pattern",
+  "Google Doc ID",
+  "Source Sheet",
+  "Output Folder ID",
+  "Status",
+];
+const DEFAULT_FILE_NAME_PATTERN_ = "{{CLIENT NAME}} - {{EMPLOYEE NAME}}";
+
+function ensureTemplateRegistrySchema_(ss) {
+  let sheet = ss.getSheetByName("Template Registry");
+  if (!sheet) {
+    createSheetIfMissing_(ss, "Template Registry", TEMPLATE_REGISTRY_HEADERS_);
+    return;
+  }
+
+  const lastColumn = Math.max(sheet.getLastColumn(), 1);
+  const values = sheet.getRange(1, 1, sheet.getLastRow(), lastColumn).getDisplayValues();
+  const headers = values[0].map((header) => String(header).trim());
+  const rows = values.slice(1).filter((row) => row.some((cell) => cell !== ""));
+  const headerIndexes = {};
+  headers.forEach((header, index) => {
+    if (header) headerIndexes[header] = index;
+  });
+
+  const normalizedRows = rows.map((row) => {
+    const getValue = (header) =>
+      headerIndexes[header] === undefined ? "" : row[headerIndexes[header]] || "";
+    let pattern = getValue("File Name Pattern");
+    let docId = getValue("Google Doc ID");
+    let sourceSheet = getValue("Source Sheet");
+    let outputFolderId = getValue("Output Folder ID");
+    let status = getValue("Status");
+
+    // Older five-column writes landed one position too early after the new
+    // pattern column was added. Repair only the recognizable shifted shape.
+    const looksShifted =
+      !status &&
+      outputFolderId.toLowerCase() === "active" &&
+      /^[\w-]{25,}$/.test(pattern);
+    if (looksShifted) {
+      const legacyDocId = pattern;
+      const legacySourceSheet = docId;
+      const legacyOutputFolderId = sourceSheet;
+      const legacyStatus = outputFolderId;
+      pattern = DEFAULT_FILE_NAME_PATTERN_;
+      docId = legacyDocId;
+      sourceSheet = legacySourceSheet;
+      outputFolderId = legacyOutputFolderId;
+      status = legacyStatus;
+    }
+
+    return [
+      getValue("Template Name"),
+      pattern || DEFAULT_FILE_NAME_PATTERN_,
+      docId,
+      sourceSheet,
+      outputFolderId,
+      status || "Active",
+    ];
+  });
+
+  const schemaMatches =
+    headers.length === TEMPLATE_REGISTRY_HEADERS_.length &&
+    TEMPLATE_REGISTRY_HEADERS_.every((header, index) => headers[index] === header);
+  if (schemaMatches && normalizedRows.every((row, index) =>
+    row.every((value, column) => value === values[index + 1][column]),
+  )) return;
+
+  sheet.clearContents();
+  sheet
+    .getRange(1, 1, 1 + normalizedRows.length, TEMPLATE_REGISTRY_HEADERS_.length)
+    .setValues([TEMPLATE_REGISTRY_HEADERS_, ...normalizedRows]);
+  sheet.setFrozenRows(1);
+}
+
 function getSheetDataAsObjects_(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error("Sheet not found: " + sheetName);
@@ -37,13 +114,30 @@ function getTemplateByName_(name) {
 
 function addTemplateToRegistry_(
   templateName,
+  fileNamePattern,
   docId,
   sourceSheet,
   outputFolderId,
 ) {
   const sheet =
     SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Template Registry");
-  sheet.appendRow([templateName, docId, sourceSheet, outputFolderId, "Active"]);
+  const headers = sheet
+    .getRange(1, 1, 1, sheet.getLastColumn())
+    .getDisplayValues()[0]
+    .map((header) => String(header).trim());
+  const row = Array(headers.length).fill("");
+  const values = {
+    "Template Name": templateName,
+    "File Name Pattern": fileNamePattern,
+    "Google Doc ID": docId,
+    "Source Sheet": sourceSheet,
+    "Output Folder ID": outputFolderId,
+    Status: "Active",
+  };
+  headers.forEach((header, index) => {
+    if (Object.prototype.hasOwnProperty.call(values, header)) row[index] = values[header];
+  });
+  sheet.appendRow(row);
 }
 
 function getSetting_(key) {
